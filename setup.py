@@ -21,7 +21,7 @@ setup(
         'alive_progress >= 2.4.1',
         'beautifulsoup4 >= 4.11.1',
         'requests >= 2.28.1',
-        'googletrans == 4.0.0rc1',
+        'deep-translator >= 1.11.4',
         'pprintpp >= 0.4.0',
     ],
     entry_points='''
