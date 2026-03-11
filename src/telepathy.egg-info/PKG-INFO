@@ -16,7 +16,7 @@ Requires-Dist: colorama>=0.4.3
 Requires-Dist: alive_progress>=2.4.1
 Requires-Dist: beautifulsoup4>=4.11.1
 Requires-Dist: requests>=2.28.1
-Requires-Dist: googletrans==4.0.0rc1
+Requires-Dist: deep-translator>=1.11.4
 Requires-Dist: pprintpp>=0.4.0
 Dynamic: author
 Dynamic: author-email

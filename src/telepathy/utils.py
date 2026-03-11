@@ -1,5 +1,5 @@
 from colorama import Fore, Style
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 from telepathy.const import __version__, user_agent
 import requests
 import textwrap
@@ -81,12 +81,15 @@ def process_message(mess, user_lang):
         mess_txt = "None"
 
     if mess_txt != "None":
-        translator = Translator()
-        detection = translator.detect(mess_txt)
-        translation_confidence = detection.confidence
-        translation = translator.translate(mess_txt, dest=user_lang)
-        original_language = translation.src
-        translated_text = translation.text
+        try:
+            translator = GoogleTranslator(source="auto", target=user_lang)
+            translated_text = translator.translate(mess_txt)
+            original_language = "auto"
+            translation_confidence = "N/A"
+        except Exception:
+            original_language = user_lang
+            translated_text = mess_txt
+            translation_confidence = "N/A"
     else:
         original_language = user_lang
         translated_text = "N/A"
@@ -107,12 +110,15 @@ def process_description(desc, user_lang):
         desc_txt = "None"
 
     if desc_txt != "None":
-        translator = Translator()
-        detection = translator.detect(desc_txt)
-        translation_confidence = detection.confidence
-        translation = translator.translate(desc_txt, dest=user_lang)
-        original_language = translation.src
-        translated_text = translation.text
+        try:
+            translator = GoogleTranslator(source="auto", target=user_lang)
+            translated_text = translator.translate(desc_txt)
+            original_language = "auto"
+            translation_confidence = "N/A"
+        except Exception:
+            original_language = user_lang
+            translated_text = desc_txt
+            translation_confidence = "N/A"
     else:
         original_language = user_lang
         translated_text = "N/A"
