@@ -1,5 +1,5 @@
 import pytest
-from src.telepathy.telepathy import Group_Chat_Analisys, Telepathy_cli
+from telepathy.telepathy import Group_Chat_Analisys, Telepathy_cli
 import asyncio
 
 
