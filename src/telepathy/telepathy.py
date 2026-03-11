@@ -2097,6 +2097,8 @@ def cli(
     translate,
     triangulate_membership,
 ):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     telepathy_cli = Telepathy_cli(
         target,
         comprehensive,
@@ -2112,8 +2114,6 @@ def cli(
         translate,
         triangulate_membership,
     )
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     loop.run_until_complete(telepathy_cli.connect_tg_client_and_run())
 
 
