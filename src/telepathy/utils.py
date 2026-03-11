@@ -149,7 +149,7 @@ def parse_html_page(url):
     total_participants = ""
     try:
         name = soup.find("div", {"class": ["tgme_page_title"]}).text
-    except:
+    except Exception:
         name = "Not found"
     try:
         group_description = (
@@ -158,7 +158,7 @@ def parse_html_page(url):
             .replace("\n", " ")
         )
         # descript = Fore.GREEN + "Description: " + Style.RESET_ALL + group_description
-    except:
+    except Exception:
         group_description = "None"
         # descript = Fore.GREEN + "Description: " + Style.RESET_ALL + group_description
     try:
@@ -171,7 +171,7 @@ def parse_html_page(url):
             .replace("subscribers", "")
             .replace("member", "")
         )
-    except:
+    except Exception:
         total_participants = "Not found"
     return {
         "name": name,
