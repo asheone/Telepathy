@@ -184,7 +184,7 @@ class Group_Chat_Analisys:
             try:
                 current_entity = await self.client.get_entity(int(_target))
                 target = int(_target)
-            except:
+            except Exception:
                 pass
             pass
         if not current_entity:
@@ -1247,12 +1247,12 @@ class Group_Chat_Analisys:
                                                 f_from_id, True
                                             )
                                             result = ""
-                                            username = ent_info["entityt"].username
+                                            username = ent_info["entity"].username
                                             if ent_info:
                                                 if ent_info["chat_type"] == "User":
                                                     result = (
                                                         "User: {} / ID: {} ".format(
-                                                            ent_info[""], ent_info[""]
+                                                            ent_info["first_name"], ent_info["user_id"]
                                                         )
                                                     )
                                                 elif (
@@ -1573,15 +1573,16 @@ class Telepathy_cli:
         self.json_check = True if json else False
         self.translate_check = True if translate else False
         self.last_date, self.chunk_size, self.user_language = None, 1000, "en"
-        self.bot = bot is not None
+        self.bot = bool(bot)
         self.alt = 0 if alt is None else int(alt)
         self.filetime = datetime.datetime.now().strftime("%Y_%m_%d-%H_%M")
         self.filetime_clean = str(self.filetime)
 
         if bot:
-            if ":" in bot:
-                self.bot_id = bot.split(":")[0]
-                self.hash = bot.split(":")[1]
+            bot_str = bot[0] if isinstance(bot, tuple) else bot
+            if ":" in bot_str:
+                self.bot_id = bot_str.split(":")[0]
+                self.hash = bot_str.split(":")[1]
             else:
                 color_print_green(
                     " [!] ",
@@ -1653,7 +1654,7 @@ class Telepathy_cli:
                 content = file.readlines()
                 details = content[self.alt]
                 _api_id, _api_hash, _phone_number = details.split(sep=",")
-            except:
+            except Exception:
                 _api_id, _api_hash, _phone_number = self.login_function()
                 with open(self.login, "a+", encoding="utf-8") as file_io:
                     file_io.write(
@@ -1691,7 +1692,7 @@ class Telepathy_cli:
                         stream=None,
                     )
                 )
-            result = self.client(
+            result = await self.client(
                 GetDialogsRequest(
                     offset_date=self.last_date,
                     offset_id=0,
@@ -1795,7 +1796,7 @@ class Telepathy_cli:
 
                 locations_list.append([ID, distance])
                 l_save_list.append([ID, distance, latitude, longitude, self.filetime])
-            except:
+            except Exception:
                 pass
 
         user_df = pd.DataFrame(locations_list, columns=["User_ID", "Distance"])
@@ -1831,7 +1832,7 @@ class Telepathy_cli:
         print_shell("location_report", distance_obj)
 
         # Display user and channel information
-        current_time = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S+00:00")
+        current_time = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S+00:00")
 
         for user in result.users:
             name = str(user.first_name) + (" " + str(user.last_name) if user.last_name else "")

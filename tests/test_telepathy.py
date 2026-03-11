@@ -22,6 +22,8 @@ def detail_to_group_basic():
     }
 
 def test_channel_group_basic(detail_to_group_basic):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     tele_cli = Telepathy_cli(
         detail_to_group_basic["target"],
         detail_to_group_basic["comprehensive"],
@@ -50,8 +52,6 @@ def test_channel_group_basic(detail_to_group_basic):
         translate=tele_cli.translate_check,
     )
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     loop.run_until_complete(tele_cli.client.connect())
     loop.run_until_complete(group_chan.retrieve_self_history(None))
     assert group_chan.history_count > 0
