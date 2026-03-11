@@ -1625,7 +1625,7 @@ class Telepathy_cli:
         self.bots_dir = os.path.join(self.telepathy_file, "bots")
         self.create_path(self.overlaps_dir)
         self.target = target
-        self.create_tg_client()
+        self.load_credentials()
 
     @staticmethod
     def create_path(path_d):
@@ -1662,21 +1662,23 @@ class Telepathy_cli:
                     )
             return _api_id, _api_hash, _phone_number
 
-    def create_tg_client(self):
+    def load_credentials(self):
         if os.path.isfile(self.login) == False:
             api_id, api_hash, phone_number = self.login_function()
             with open(self.login, "w+", encoding="utf-8") as f:
                 f.write(api_id + "," + api_hash + "," + phone_number + "\n")
         else:
-            self.api_id, self.api_hash, self.phone_number = self.retrieve_alt()
-        """End of API details"""
+            api_id, api_hash, phone_number = self.retrieve_alt()
+        self.api_id = api_id
+        self.api_hash = api_hash
+        self.phone_number = phone_number
+
+    async def connect_tg_client_and_run(self):
         self.client = TelegramClient(
             os.path.join(self.telepathy_file, "{}.session".format(self.phone_number)),
             self.api_id,
             self.api_hash,
         )
-
-    async def connect_tg_client_and_run(self):
         await self.client.connect()
         if not await self.client.is_user_authorized():
             await self.client.send_code_request(self.phone_number)
@@ -2098,8 +2100,6 @@ def cli(
     translate,
     triangulate_membership,
 ):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     telepathy_cli = Telepathy_cli(
         target,
         comprehensive,
@@ -2115,7 +2115,7 @@ def cli(
         translate,
         triangulate_membership,
     )
-    loop.run_until_complete(telepathy_cli.connect_tg_client_and_run())
+    asyncio.run(telepathy_cli.connect_tg_client_and_run())
 
 
 if __name__ == "__main__":

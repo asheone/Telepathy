@@ -22,8 +22,6 @@ def detail_to_group_basic():
     }
 
 def test_channel_group_basic(detail_to_group_basic):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
     tele_cli = Telepathy_cli(
         detail_to_group_basic["target"],
         detail_to_group_basic["comprehensive"],
@@ -39,19 +37,30 @@ def test_channel_group_basic(detail_to_group_basic):
         detail_to_group_basic["translate"],
         detail_to_group_basic["triangulate_membership"],
     )
-    group_chan = Group_Chat_Analisys(
-        target=detail_to_group_basic["target"],
-        client=tele_cli.client,
-        log_file=tele_cli.log_file,
-        filetime=tele_cli.filetime,
-        replies=tele_cli.reply_analysis,
-        forwards=tele_cli.forwards_check,
-        comprehensive=tele_cli.comp_check,
-        media=tele_cli.media_archive,
-        json=tele_cli.json_check,
-        translate=tele_cli.translate_check,
-    )
 
-    loop.run_until_complete(tele_cli.client.connect())
-    loop.run_until_complete(group_chan.retrieve_self_history(None))
-    assert group_chan.history_count > 0
+    async def run_test():
+        tele_cli.client = __import__('telethon').TelegramClient(
+            __import__('os').path.join(
+                tele_cli.telepathy_file,
+                "{}.session".format(tele_cli.phone_number),
+            ),
+            tele_cli.api_id,
+            tele_cli.api_hash,
+        )
+        await tele_cli.client.connect()
+        group_chan = Group_Chat_Analisys(
+            target=detail_to_group_basic["target"],
+            client=tele_cli.client,
+            log_file=tele_cli.log_file,
+            filetime=tele_cli.filetime,
+            replies=tele_cli.reply_analysis,
+            forwards=tele_cli.forwards_check,
+            comprehensive=tele_cli.comp_check,
+            media=tele_cli.media_archive,
+            json=tele_cli.json_check,
+            translate=tele_cli.translate_check,
+        )
+        await group_chan.retrieve_self_history(None)
+        assert group_chan.history_count > 0
+
+    asyncio.run(run_test())
