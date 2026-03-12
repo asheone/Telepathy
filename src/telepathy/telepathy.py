@@ -124,6 +124,27 @@ class Group_Chat_Analisys:
         self.end_date = end_date
         self.create_dirs_files()
 
+    def _iter_messages_kwargs(self):
+        """Build kwargs for iter_messages based on active date filters.
+
+        When start_date is set, uses reverse=True + offset_date=start_date
+        so Telethon requests only messages AFTER start_date from the server.
+        When only end_date is set, uses offset_date=end_date (default order).
+        """
+        kwargs = {}
+        if self.start_date:
+            kwargs["reverse"] = True
+            kwargs["offset_date"] = self.start_date
+        elif self.end_date:
+            kwargs["offset_date"] = self.end_date
+        return kwargs
+
+    def _message_past_end_date(self, message):
+        """Return True if message is past end_date and iteration should stop."""
+        if self.end_date and message.date and message.date > self.end_date:
+            return True
+        return False
+
     def telepathy_log_run(self):
         log = []
         log.append(
@@ -181,6 +202,15 @@ class Group_Chat_Analisys:
     async def retrieve_entity(self, _target):
         current_entity = None
         target = None
+
+        # Extract numeric ID from Peer objects before lookup
+        if isinstance(_target, PeerChannel):
+            _target = _target.channel_id
+        elif isinstance(_target, PeerUser):
+            _target = _target.user_id
+        elif isinstance(_target, PeerChat):
+            _target = _target.chat_id
+
         try:
             current_entity = await self.client.get_entity(_target)
             target = _target
@@ -260,18 +290,20 @@ class Group_Chat_Analisys:
         if not _result["entity"] or (
             _result["entity"].__class__ == User and _check_user
         ):
-            if _result["entity"].__class__ == User:
-                color_print_green(
-                    " [!] ",
-                    "You can't search for users using flag -c, run Telepathy using the flag -u.",
-                )
-                exit(1)
+            if _result["entity"] and _result["entity"].__class__ == User:
+                if not _check_user:
+                    color_print_green(
+                        " [!] ",
+                        "You can't search for users using flag -c, run Telepathy using the flag -u.",
+                    )
+                    exit(1)
             else:
                 color_print_green(
                     " [!] ", "Telegram handle: {} wasn't found. !!!!".format(_handle)
                 )
-                exit(1)
-            return
+                if not _check_user:
+                    exit(1)
+            return None
         elif _check_user:
             if _result["entity"].__class__ == User:
                 _result = {"chat_type": "User"}
@@ -744,15 +776,18 @@ class Group_Chat_Analisys:
             color_print_green(" [-] ", "Fetching forwarded messages...")
             progress_bar = Fore.GREEN + " [-] " + Style.RESET_ALL + "Progress: "
 
+            _iter_kwargs = self._iter_messages_kwargs()
+            _has_date_filter = self.start_date or self.end_date
+
             with alive_bar(
-                forward_count, dual_line=True, title=progress_bar, length=20
+                0 if _has_date_filter else forward_count,
+                dual_line=True, title=progress_bar, length=20,
             ) as bar:
 
                 async for message in self.client.iter_messages(
-                    _target,
-                    offset_date=self.end_date,
+                    _target, **_iter_kwargs,
                 ):
-                    if self.start_date and message.date < self.start_date:
+                    if self._message_past_end_date(message):
                         break
                     if message.forward is not None:
                         try:
@@ -889,6 +924,22 @@ class Group_Chat_Analisys:
                 forwards_list = []
                 replies_list = []
                 user_replier_list = []
+                _save_batch_size = 100
+                _last_saved_count = 0
+                _archive_columns = [
+                    "To", "Message ID", "Display_name", "User ID",
+                    "Message_text", "Original_language", "Translated_text",
+                    "Translation_confidence", "Timestamp", "Has_media",
+                    "Reply_to_ID", "Replies", "Forwards", "Views",
+                    "Total_reactions", "Reply_ER_reach", "Reply_ER_impressions",
+                    "Forwards_ER_reach", "Forwards_ER_impressions",
+                    "Reaction_ER_reach", "Reactions_ER_impressions",
+                    "Thumbs_up", "Thumbs_down", "Heart", "Fire",
+                    "Smile_with_hearts", "Clap", "Smile", "Thinking",
+                    "Exploding_head", "Scream", "Angry", "Single_tear",
+                    "Party", "Starstruck", "Vomit", "Poop", "Pray",
+                    "Edit_date", "URL", "Media save directory",
+                ]
                 forward_count, private_count, message_count, total_reactions = (
                     0,
                     0,
@@ -907,8 +958,12 @@ class Group_Chat_Analisys:
                 color_print_green(" [-] ", "Fetching message archive...")
                 progress_bar = Fore.GREEN + " [-] " + Style.RESET_ALL + "Progress: "
 
+                _iter_kwargs = self._iter_messages_kwargs()
+                _has_date_filter = self.start_date or self.end_date
+                _bar_total = 0 if _has_date_filter else self.history_count
+
                 with alive_bar(
-                    self.history_count,
+                    _bar_total,
                     dual_line=True,
                     title=progress_bar,
                     length=20,
@@ -917,57 +972,15 @@ class Group_Chat_Analisys:
                     to_ent = self._entity
 
                     async for message in self.client.iter_messages(
-                        _target, limit=None, offset_date=self.end_date,
+                        _target, limit=None, **_iter_kwargs,
                     ):
-                        if self.start_date and message.date < self.start_date:
+                        if self._message_past_end_date(message):
                             break
                         if message is not None:
                             try:
                                 c_archive = pd.DataFrame(
                                     message_list,
-                                    columns=[
-                                        "To",
-                                        "Message ID",
-                                        "Display_name",
-                                        "User ID",
-                                        "Message_text",
-                                        "Original_language",
-                                        "Translated_text",
-                                        "Translation_confidence",
-                                        "Timestamp",
-                                        "Has_media",
-                                        "Reply_to_ID",
-                                        "Replies",
-                                        "Forwards",
-                                        "Views",
-                                        "Total_reactions",
-                                        "Reply_ER_reach",
-                                        "Reply_ER_impressions",
-                                        "Forwards_ER_reach",
-                                        "Forwards_ER_impressions",
-                                        "Reaction_ER_reach",
-                                        "Reactions_ER_impressions",
-                                        "Thumbs_up",
-                                        "Thumbs_down",
-                                        "Heart",
-                                        "Fire",
-                                        "Smile_with_hearts",
-                                        "Clap",
-                                        "Smile",
-                                        "Thinking",
-                                        "Exploding_head",
-                                        "Scream",
-                                        "Angry",
-                                        "Single_tear",
-                                        "Party",
-                                        "Starstruck",
-                                        "Vomit",
-                                        "Poop",
-                                        "Pray",
-                                        "Edit_date",
-                                        "URL",
-                                        "Media save directory",
-                                    ],
+                                    columns=_archive_columns,
                                 )
 
                                 c_forwards = pd.DataFrame(
@@ -1034,10 +1047,18 @@ class Group_Chat_Analisys:
                                             message.chat_id,
                                             reply_to=message.id,
                                         ):
-
-                                            user = await self.client.get_entity(
-                                                repl.from_id.user_id
-                                            )
+                                            if not repl.from_id:
+                                                continue
+                                            if isinstance(repl.from_id, PeerUser):
+                                                sender_id = repl.from_id.user_id
+                                            elif isinstance(repl.from_id, PeerChannel):
+                                                sender_id = repl.from_id.channel_id
+                                            else:
+                                                continue
+                                            try:
+                                                user = await self.client.get_entity(sender_id)
+                                            except Exception:
+                                                continue
 
                                             userdet = populate_user(user, _target)
                                             user_replier_list.append(userdet)
@@ -1266,8 +1287,11 @@ class Group_Chat_Analisys:
                                             ent_info = await self.retrieve_entity_info(
                                                 f_from_id, True
                                             )
+                                            if not ent_info:
+                                                continue
                                             result = ""
-                                            username = ent_info["entity"].username
+                                            username = ent_info.get("entity", {})
+                                            username = username.username if hasattr(username, "username") else "N/A"
                                             if ent_info:
                                                 if ent_info["chat_type"] == "User":
                                                     result = (
@@ -1284,7 +1308,6 @@ class Group_Chat_Analisys:
                                                     result = ent_info["entity"].title
                                                 elif ent_info["chat_type"] == "Channel":
                                                     result = ent_info["entity"].title
-                                                    print("user")
 
                                             forwards_list.append(
                                                 [
@@ -1354,8 +1377,21 @@ class Group_Chat_Analisys:
                                 ]
                             )
 
+                        # Incremental save every _save_batch_size messages
+                        if len(message_list) - _last_saved_count >= _save_batch_size:
+                            _last_saved_count = len(message_list)
+                            pd.DataFrame(
+                                message_list, columns=_archive_columns,
+                            ).to_csv(self.file_archive, sep=";", index=False)
+
                         time.sleep(0.5)
                         bar()
+
+                if _has_date_filter:
+                    color_print_green(
+                        " [!] ",
+                        "Date filter applied: {} messages fetched".format(len(message_list)),
+                    )
 
                 if self.reply_analysis is True:
                     if len(replies_list) > 0:
