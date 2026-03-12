@@ -103,6 +103,8 @@ class Group_Chat_Analisys:
         media,
         json,
         translate,
+        start_date=None,
+        end_date=None,
     ):
         self.client = client
         self._target = target
@@ -118,6 +120,8 @@ class Group_Chat_Analisys:
         self.json_check = True if json else False
         self.translate_check = True if translate else False
         self.last_date, self.chunk_size, self.user_language = None, 1000, "en"
+        self.start_date = start_date
+        self.end_date = end_date
         self.create_dirs_files()
 
     def telepathy_log_run(self):
@@ -546,6 +550,13 @@ class Group_Chat_Analisys:
             color_print_green(" [!] ", "Performing comprehensive scan")
         if self.forwards_check:
             color_print_green(" [!] ", "Forwards will be fetched")
+        if self.start_date or self.end_date:
+            date_range = ""
+            if self.start_date:
+                date_range += "from " + self.start_date.strftime("%Y-%m-%d")
+            if self.end_date:
+                date_range += " to " + self.end_date.strftime("%Y-%m-%d")
+            color_print_green(" [!] ", "Date filter: " + date_range.strip())
 
         if self.basic is True or self.comp_check is True:
             if self._chat_type != "Channel":
@@ -737,7 +748,12 @@ class Group_Chat_Analisys:
                 forward_count, dual_line=True, title=progress_bar, length=20
             ) as bar:
 
-                async for message in self.client.iter_messages(_target):
+                async for message in self.client.iter_messages(
+                    _target,
+                    offset_date=self.end_date,
+                ):
+                    if self.start_date and message.date < self.start_date:
+                        break
                     if message.forward is not None:
                         try:
                             f_from_id = message.forward.original_fwd.from_id
@@ -900,7 +916,11 @@ class Group_Chat_Analisys:
 
                     to_ent = self._entity
 
-                    async for message in self.client.iter_messages(_target, limit=None):
+                    async for message in self.client.iter_messages(
+                        _target, limit=None, offset_date=self.end_date,
+                    ):
+                        if self.start_date and message.date < self.start_date:
+                            break
                         if message is not None:
                             try:
                                 c_archive = pd.DataFrame(
@@ -1559,6 +1579,9 @@ class Telepathy_cli:
         replies,
         translate,
         triangulate_membership,
+        start_date=None,
+        end_date=None,
+        last_days=None,
     ):
 
         self.config_p = configparser.ConfigParser()
@@ -1572,6 +1595,20 @@ class Telepathy_cli:
         self.media_archive = True if media else False
         self.json_check = True if json else False
         self.translate_check = True if translate else False
+
+        # Parse date range filters
+        if last_days is not None:
+            self.start_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=last_days)
+            self.end_date = None
+        else:
+            self.start_date = (
+                datetime.datetime.strptime(start_date, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+                if start_date else None
+            )
+            self.end_date = (
+                datetime.datetime.strptime(end_date, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+                if end_date else None
+            )
         self.last_date, self.chunk_size, self.user_language = None, 1000, "en"
         self.bot = bool(bot)
         self.alt = 0 if alt is None else int(alt)
@@ -1726,6 +1763,8 @@ class Telepathy_cli:
                         self.media_archive,
                         self.json_check,
                         self.translate_check,
+                        self.start_date,
+                        self.end_date,
                     )
                     await group_channel.f_export()
                 else:
@@ -1740,6 +1779,8 @@ class Telepathy_cli:
                         self.media_archive,
                         self.json_check,
                         self.translate_check,
+                        self.start_date,
+                        self.end_date,
                     )
                     await group_channel.analyze_group_channel()
 
@@ -2085,6 +2126,25 @@ class Telepathy_cli:
     default=False,
     help="Get interpolation from a list of groups",
 )
+@click.option(
+    "--start-date",
+    "-sd",
+    default=None,
+    help="Start date for messages (YYYY-MM-DD). Only fetch messages after this date.",
+)
+@click.option(
+    "--end-date",
+    "-ed",
+    default=None,
+    help="End date for messages (YYYY-MM-DD). Only fetch messages before this date.",
+)
+@click.option(
+    "--last-days",
+    "-ld",
+    default=None,
+    type=int,
+    help="Fetch messages from the last N days (e.g. 30, 90, 180).",
+)
 def cli(
     target,
     comprehensive,
@@ -2099,6 +2159,9 @@ def cli(
     replies,
     translate,
     triangulate_membership,
+    start_date,
+    end_date,
+    last_days,
 ):
     telepathy_cli = Telepathy_cli(
         target,
@@ -2114,6 +2177,9 @@ def cli(
         replies,
         translate,
         triangulate_membership,
+        start_date,
+        end_date,
+        last_days,
     )
     asyncio.run(telepathy_cli.connect_tg_client_and_run())
 
