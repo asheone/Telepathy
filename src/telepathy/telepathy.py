@@ -124,6 +124,27 @@ class Group_Chat_Analisys:
         self.end_date = end_date
         self.create_dirs_files()
 
+    def _iter_messages_kwargs(self):
+        """Build kwargs for iter_messages based on active date filters.
+
+        When start_date is set, uses reverse=True + offset_date=start_date
+        so Telethon requests only messages AFTER start_date from the server.
+        When only end_date is set, uses offset_date=end_date (default order).
+        """
+        kwargs = {}
+        if self.start_date:
+            kwargs["reverse"] = True
+            kwargs["offset_date"] = self.start_date
+        elif self.end_date:
+            kwargs["offset_date"] = self.end_date
+        return kwargs
+
+    def _message_past_end_date(self, message):
+        """Return True if message is past end_date and iteration should stop."""
+        if self.end_date and message.date and message.date > self.end_date:
+            return True
+        return False
+
     def telepathy_log_run(self):
         log = []
         log.append(
@@ -744,15 +765,18 @@ class Group_Chat_Analisys:
             color_print_green(" [-] ", "Fetching forwarded messages...")
             progress_bar = Fore.GREEN + " [-] " + Style.RESET_ALL + "Progress: "
 
+            _iter_kwargs = self._iter_messages_kwargs()
+            _has_date_filter = self.start_date or self.end_date
+
             with alive_bar(
-                forward_count, dual_line=True, title=progress_bar, length=20
+                0 if _has_date_filter else forward_count,
+                dual_line=True, title=progress_bar, length=20,
             ) as bar:
 
                 async for message in self.client.iter_messages(
-                    _target,
-                    offset_date=self.end_date,
+                    _target, **_iter_kwargs,
                 ):
-                    if self.start_date and message.date < self.start_date:
+                    if self._message_past_end_date(message):
                         break
                     if message.forward is not None:
                         try:
@@ -907,8 +931,12 @@ class Group_Chat_Analisys:
                 color_print_green(" [-] ", "Fetching message archive...")
                 progress_bar = Fore.GREEN + " [-] " + Style.RESET_ALL + "Progress: "
 
+                _iter_kwargs = self._iter_messages_kwargs()
+                _has_date_filter = self.start_date or self.end_date
+                _bar_total = 0 if _has_date_filter else self.history_count
+
                 with alive_bar(
-                    self.history_count,
+                    _bar_total,
                     dual_line=True,
                     title=progress_bar,
                     length=20,
@@ -917,9 +945,9 @@ class Group_Chat_Analisys:
                     to_ent = self._entity
 
                     async for message in self.client.iter_messages(
-                        _target, limit=None, offset_date=self.end_date,
+                        _target, limit=None, **_iter_kwargs,
                     ):
-                        if self.start_date and message.date < self.start_date:
+                        if self._message_past_end_date(message):
                             break
                         if message is not None:
                             try:
@@ -1356,6 +1384,12 @@ class Group_Chat_Analisys:
 
                         time.sleep(0.5)
                         bar()
+
+                if _has_date_filter:
+                    color_print_green(
+                        " [!] ",
+                        "Date filter applied: {} messages fetched".format(len(message_list)),
+                    )
 
                 if self.reply_analysis is True:
                     if len(replies_list) > 0:
