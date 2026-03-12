@@ -1621,7 +1621,8 @@ class Telepathy_cli:
     ):
 
         self.config_p = configparser.ConfigParser()
-        self.config_p.read(os.path.join("config", "config.ini"))
+        _config_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config")
+        self.config_p.read(os.path.join(_config_dir, "config.ini"))
         # Defining default values
         self.user_check = self.location_check = False
         self.basic = True if target else False
@@ -1685,6 +1686,9 @@ class Telepathy_cli:
             self.export_file = os.path.join(
                 self.telepathy_file, self.config_p["telepathy"]["export_file"]
             )
+            self.location_dir = os.path.join(
+                self.telepathy_file, self.config_p["telepathy"]["location"]
+            )
         else:
             self.telepathy_file = os.path.join(
                 "..", "src", "telepathy", "telepathy_files"
@@ -1693,6 +1697,7 @@ class Telepathy_cli:
             self.login = os.path.join(self.telepathy_file, "login.txt")
             self.log_file = os.path.join(self.telepathy_file, "log.csv")
             self.export_file = os.path.join(self.telepathy_file, "export.csv")
+            self.location_dir = os.path.join(self.telepathy_file, "locations")
         self.create_path(self.telepathy_file)
         self.overlaps_dir = os.path.join(self.telepathy_file, "overlaps")
         self.bots_dir = os.path.join(self.telepathy_file, "bots")
@@ -1841,9 +1846,7 @@ class Telepathy_cli:
 
         latitude, longitude = map(float, _target.split(','))
 
-        locations_file = self.create_path(
-            os.path.join(self.telepathy_file, self.config_p["telepathy"]["location"])
-        )
+        locations_file = self.create_path(self.location_dir)
         save_file = (
             locations_file
             + f"{latitude}_{longitude}_locations_{self.filetime_clean}.csv"
@@ -1868,7 +1871,15 @@ class Telepathy_cli:
                 ID = 0
                 distance = 0
                 if hasattr(user, "peer"):
-                    ID = user.peer.user_id
+                    peer = user.peer
+                    if isinstance(peer, PeerUser):
+                        ID = peer.user_id
+                    elif isinstance(peer, PeerChannel):
+                        ID = peer.channel_id
+                    elif isinstance(peer, PeerChat):
+                        ID = peer.chat_id
+                    else:
+                        continue
 
                 if hasattr(user, "distance"):
                     distance = user.distance
@@ -1889,7 +1900,10 @@ class Telepathy_cli:
 
         for account, distance in user_df.itertuples(index=False):
             account = int(account)
-            my_user = await self.client.get_entity(types.PeerUser(account))
+            try:
+                my_user = await self.client.get_entity(account)
+            except Exception:
+                continue
             user_id = my_user.id
             distance = int(distance)
 
