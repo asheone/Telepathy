@@ -1406,6 +1406,23 @@ class Group_Chat_Analisys:
                         ) as repliers_file:
                             c_repliers.to_csv(repliers_file, sep=";")
 
+                # Ensure DataFrames exist even if no messages were fetched
+                c_archive = pd.DataFrame(
+                    message_list, columns=_archive_columns,
+                )
+                if self.forwards_check:
+                    c_forwards = pd.DataFrame(
+                        forwards_list,
+                        columns=[
+                            "Source", "Target", "Label",
+                            "Source_ID", "Username", "Timestamp",
+                        ],
+                    )
+
+                if len(message_list) == 0:
+                    color_print_green(" [!] ", "No messages found matching the criteria.")
+                    return
+
                 with open(self.file_archive, "w+", encoding="utf-8") as archive_file:
                     c_archive.to_csv(archive_file, sep=";")
 
@@ -1865,6 +1882,13 @@ class Telepathy_cli:
                 self_expires=42,
             )
         )
+
+        if not result.updates or not hasattr(result.updates[0], "peers"):
+            print(
+                Fore.GREEN + " [!] " + Style.RESET_ALL
+                + "No users or channels found near this location."
+            )
+            return
 
         for user in result.updates[0].peers:
             try:
